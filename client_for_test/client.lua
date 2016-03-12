@@ -8,4 +8,4 @@ local socket = require("socket");
 host = "127.0.0.1";
 port = "8090";
 client = assert(socket.connect(host,port));
-client:send("hello lua")
+client:send("hello \r\n lua \r\n")

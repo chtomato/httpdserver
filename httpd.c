@@ -41,15 +41,56 @@ static int startup(unsigned short *port)
 		error_die("listen");
 	return httpd;
 }
+
+static get_line(int sock,char *buf,int size)
+{
+	int i = 0;
+	char c = '\0';
+	int n;
+	//把终止条件统一为 \n 标准化buf数组
+	while ( (i < size - 1) && (c != '\n')){
+		if ((n = recv(sock,&c,1,0)) > 0 ){
+			if (c == '\r'){
+				n = recv(sock,&c,1,MSG_PEEK);//使用MSG_PEEK标志使下一次读取依然可以得到这次读取的内容，可以认为接受窗口不滑动
+				if((n > 0) && (c=='\n'))//从tcp buf中将换行符删除掉
+					recv(sock,&c,1,0);
+				else
+					c = '\n';
+			}
+			buf[i++] = c;
+			
+		}else
+			c = '\n';
+	}
+	buf[i] = '\0';
+	return i;
+}
+
 void accept_request(int client)
 {
-	//1.test 
+	/*1.test 
 	char buf[1024] = {'\0'};
 	int length = recv(client,buf,1024,0);
 	if (length < 0)
 		error_die("recv");
 
 	printf("recv:%s\n",buf);
+	*/
+	char buf[1024];
+	int numchars;
+	char method[255];
+	char url[255];
+	char path[512];
+	size_t i,j;
+	struct stat st;
+	int cgi = 0;
+	char *query_string = NULL;
+	//eg:POST / HTTP/1.1  GET /books/?sex=man&name=Professional HTTP/1.1
+	numchars = get_line(client,buf,sizeof(buf));//得到请求的第一行
+	
+	printf("buf:%s\n",buf);
+	//numchars = get_line(client,buf,sizeof(buf));//得到请求的第一行
+	//printf("buf:%s\n",buf);
 }
 int main(int argc,char *argv[])
 {
