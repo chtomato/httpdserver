@@ -11,7 +11,8 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-
+#define ISspace(x) isspace((int)(x))
+#define SERVER_STRING "Server:Tomato'httpd/0.1.0\r\n"
 static void error_die(const char *sc)
 {
 	perror(sc);//将错误原因和sc字符串输出
@@ -65,17 +66,31 @@ static get_line(int sock,char *buf,int size)
 	buf[i] = '\0';
 	return i;
 }
+static void unimplemented(int client)
+{
+	char buf[1024];
 
+	/*http method 不被支持*/
+	sprintf(buf,"HTTP/1.0 501 Method Not Implemented\r\n");
+	send(client,buf,strlen(buf),0);
+	/*服务器信息*/
+	sprintf(buf, SERVER_STRING);
+    send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "<HTML><HEAD><TITLE>Method Not Implemented\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "</TITLE></HEAD>\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "<BODY><P>HTTP request method not supported.\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "</BODY></HTML>\r\n");
+	send(client, buf, strlen(buf), 0);
+}
 void accept_request(int client)
 {
-	/*1.test 
-	char buf[1024] = {'\0'};
-	int length = recv(client,buf,1024,0);
-	if (length < 0)
-		error_die("recv");
-
-	printf("recv:%s\n",buf);
-	*/
 	char buf[1024];
 	int numchars;
 	char method[255];
@@ -87,10 +102,21 @@ void accept_request(int client)
 	char *query_string = NULL;
 	//eg:POST / HTTP/1.1  GET /books/?sex=man&name=Professional HTTP/1.1
 	numchars = get_line(client,buf,sizeof(buf));//得到请求的第一行
+	i = j = 0;
+	//把客户端请求方法存放到method数组
+	while(!ISspace(buf[i]) && (i < sizeof(method) -1))
+		method[i++]=buf[j++];
+	method[i] = '\0';
+	/*strcasecmp 判断字符串是否相当并且忽略大小写*/
+	if(strcasecmp(method,"GET") && strcasecmp(method,"POST")){
+		unimplemented(client);
+		printf("not get and post\n");
+		return;
+	}
+	/*开启cgi*/
+	if(strcasecmp(method,"POST") == 0)
+		cgi = 1;
 	
-	printf("buf:%s\n",buf);
-	//numchars = get_line(client,buf,sizeof(buf));//得到请求的第一行
-	//printf("buf:%s\n",buf);
 }
 int main(int argc,char *argv[])
 {
