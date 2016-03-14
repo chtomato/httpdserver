@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #define ISspace(x) isspace((int)(x))
 #define SERVER_STRING "Server:Tomato'httpd/0.1.0\r\n"
+
 static void error_die(const char *sc)
 {
 	perror(sc);//将错误原因和sc字符串输出
@@ -89,6 +90,31 @@ static void unimplemented(int client)
 	sprintf(buf, "</BODY></HTML>\r\n");
 	send(client, buf, strlen(buf), 0);
 }
+static void not_found(int client)
+{
+	char buf[1024];
+
+	/* 404 页面 */
+	sprintf(buf, "HTTP/1.0 404 NOT FOUND\r\n");
+	send(client, buf, strlen(buf), 0);
+	 /*服务器信息*/
+	sprintf(buf, SERVER_STRING);
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "<HTML><TITLE>Not Found</TITLE>\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "<BODY><P>The server could not fulfill\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "your request because the resource specified\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "is unavailable or nonexistent.\r\n");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "</BODY></HTML>\r\n");
+	send(client, buf, strlen(buf), 0);
+}	
 void accept_request(int client)
 {
 	char buf[1024];
@@ -125,7 +151,31 @@ void accept_request(int client)
 	while(!ISspace(buf[j]) && (i<sizeof(url)-1) && (j < sizeof(buf)))
 		url[i++] = buf[j++];//存放url
 	url[i] = '\0';
-	printf("url:%s\n",url);
+	
+	/*处理GET 方法*/
+	if(strcasecmp(method,"GET")== 0 ){
+		query_string = url;//待处理的请求url
+		while((*query_string != '?')  && (*query_string != '\0'))
+			query_string++;
+		/*GET 方法的特点,?后面为参数*/
+		if(*query_string == '?'){
+			cgi = 1;//开启cgi
+			*query_string = '\0';
+			query_string++;
+		}
+	}
+
+	/*格式化url到path数组,html文件都存放在htdocs中*/
+	sprintf(path,"htdocs%s",url);
+	/*默认情况下为index.html*/
+	if(path[strlen(path) - 1] == '/')
+		strcat(path,"index.html");
+	if(stat(path,&st) == -1){//获取文件的信息
+		//未找到对应的文件,把所有header的信息丢掉
+		while ((numchars > 0) && strcmp("\n",buf)) /*read & discard headers*/
+			numchars = get_line(client,buf,sizeof(buf));
+		not_found(client);
+	}
 }
 int main(int argc,char *argv[])
 {
