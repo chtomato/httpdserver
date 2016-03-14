@@ -116,7 +116,16 @@ void accept_request(int client)
 	/*开启cgi*/
 	if(strcasecmp(method,"POST") == 0)
 		cgi = 1;
-	
+
+	printf("buf:%s,j=%d\n",buf,j);
+	/*读取url*/
+	i = 0;
+	while(ISspace(buf[j]) && (j < sizeof(buf)))
+		j++;
+	while(!ISspace(buf[j]) && (i<sizeof(url)-1) && (j < sizeof(buf)))
+		url[i++] = buf[j++];//存放url
+	url[i] = '\0';
+	printf("url:%s\n",url);
 }
 int main(int argc,char *argv[])
 {

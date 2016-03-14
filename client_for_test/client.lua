@@ -9,7 +9,8 @@ host = "127.0.0.1";
 port = "8090";
 client = assert(socket.connect(host,port));
 client:settimeout(0);
-client:send("hello \r\n lua \r\n");
+--client:send("GET /books/?sex=man&name=Professional HTTP/1.1\r\n");
+client:send("POST / HTTP/1.1\r\n");
 local recvt, sendt, status = socket.select({client},nil,1);
 while #recvt > 0 do
 	local response, receive_status = client:receive();
