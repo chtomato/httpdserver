@@ -114,7 +114,56 @@ static void not_found(int client)
 	send(client, buf, strlen(buf), 0);
 	sprintf(buf, "</BODY></HTML>\r\n");
 	send(client, buf, strlen(buf), 0);
-}	
+}
+static void headers(int client, const char *filename)
+{
+	char buf[1024];
+	(void)filename;  /* could use filename to determine file type */
+
+	/*正常的 HTTP header */
+	strcpy(buf, "HTTP/1.0 200 OK\r\n");
+	send(client, buf, strlen(buf), 0);
+	/*服务器信息*/
+	strcpy(buf, SERVER_STRING);
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+	send(client, buf, strlen(buf), 0);
+	strcpy(buf, "\r\n");
+	send(client, buf, strlen(buf), 0);
+}
+static void cat(int client, FILE *resource)
+{
+	char buf[1024];
+	/*读取文件中的所有数据写到 socket */
+	fgets(buf, sizeof(buf), resource);
+	while (!feof(resource))
+	{
+		send(client, buf, strlen(buf), 0);
+		fgets(buf, sizeof(buf), resource);
+	}
+}
+
+static serve_file(int client,const char *filename)
+{
+	FILE *resource  = NULL;
+	int numchars = 1;
+	char buf[1024];
+	/*读取丢弃header*/
+	buf[0] = 'A';
+	buf[1] = '\0';
+	while((numchars > 0) && strcmp("\n",buf))
+		numchars = get_line(client,buf,sizeof(buf));
+	/*打开server的文件*/
+	resource = fopen(filename,"r");
+	if(resource == NULL)
+		not_found(client);
+	else{
+		/*写HTTP header*/
+		headers(client,filename);
+		cat(client,resource);//复制文件
+	}
+	fclose(resource);
+}
 void accept_request(int client)
 {
 	char buf[1024];
@@ -143,7 +192,6 @@ void accept_request(int client)
 	if(strcasecmp(method,"POST") == 0)
 		cgi = 1;
 
-	printf("buf:%s,j=%d\n",buf,j);
 	/*读取url*/
 	i = 0;
 	while(ISspace(buf[j]) && (j < sizeof(buf)))
@@ -175,7 +223,18 @@ void accept_request(int client)
 		while ((numchars > 0) && strcmp("\n",buf)) /*read & discard headers*/
 			numchars = get_line(client,buf,sizeof(buf));
 		not_found(client);
+	}else{
+		/*如果有这个目录，则默认使用该目录下的index.html*/
+		if((st.st_mode & S_IFMT) == S_IFDIR)
+			strcat(path,"index.html");
+		if((st.st_mode & S_IXUSR /*文件所有则有可执行权限*/) || (st.st_mode & S_IXGRP /*用户组具可执行权限*/) || (st.st_mode & S_IXOTH/*其他用户具可执行权限*/))
+			cgi = 1;
+		//if(!cgi)
+			serve_file(client,path);
+		//else
+		//	execute_cgi(cl)
 	}
+	close(client);
 }
 int main(int argc,char *argv[])
 {
