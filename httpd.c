@@ -221,7 +221,7 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 		}
 		if(content_length == -1){
 			bad_request(client);
-			return;
+			return -1;
 		}
 	}
 	/*ok情况下*/
@@ -230,15 +230,15 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 
 	if(pipe(cgi_input) < 0){
 		cannot_execute(client);
-		return;
+		return -1;
 	}
 	if(pipe(cgi_output) < 0){
 		cannot_execute(client);
-		return;
+		return -1;
 	}
 	if((pid = fork()) < 0 ){
 		cannot_execute(client);
-		return;
+		return -1;
 	}else if(pid == 0){
 		char meth_env[255];
 		char query_env[255];
