@@ -11,6 +11,8 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include "debug.h"
+int DEBUG_LEVEL = 4;
 #define ISspace(x) isspace((int)(x))
 #define SERVER_STRING "Server:Tomato'httpd/0.1.0\r\n"
 
@@ -254,7 +256,7 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 			sprintf(query_env,"QUERY_STRING=%s",query_string);
 			putenv(query_env);
 		}else {
-			sprintf(length_env,"CONTENT-LENGTH=%d",content_length);
+			sprintf(length_env,"CONTENT_LENGTH=%d",content_length);
 			putenv(length_env);
 		}
 		execl(path,path,NULL);
@@ -340,17 +342,21 @@ void accept_request(int client)
 			strcat(path,"index.html");
 		if((st.st_mode & S_IXUSR /*文件所有则有可执行权限*/) || (st.st_mode & S_IXGRP /*用户组具可执行权限*/) || (st.st_mode & S_IXOTH/*其他用户具可执行权限*/))
 			cgi = 1;
-		if(!cgi)
+		if(!cgi){
 			serve_file(client,path);
-		else
+			debug_inf("this not cgi");
+		}
+		else{
+			debug_inf("cgi");
 			execute_cgi(client,path,method,query_string);
+		}
 	}
 	close(client);
 }
 int main(int argc,char *argv[])
 {
 	int server_sock = -1;
-	unsigned short port = 8090;
+	unsigned short port = 8091;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	int client_name_len = sizeof(client_name);
