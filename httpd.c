@@ -46,7 +46,7 @@ static int startup(unsigned short *port)
 	return httpd;
 }
 
-static get_line(int sock,char *buf,int size)
+static int get_line(int sock,char *buf,int size)
 {
 	int i = 0;
 	char c = '\0';
@@ -145,7 +145,7 @@ static void cat(int client, FILE *resource)
 	}
 }
 
-static serve_file(int client,const char *filename)
+static void serve_file(int client,const char *filename)
 {
 	FILE *resource  = NULL;
 	int numchars = 1;
@@ -166,13 +166,13 @@ static serve_file(int client,const char *filename)
 	}
 	fclose(resource);
 }
-void bad_request(int client)  
+static void bad_request(int client)  
 {  
 	char buf[1024];
 	/*回应客户端错误的 HTTP 请求 */  
 	sprintf(buf, "HTTP/1.0 400 BAD REQUEST\r\n");  
 	send(client, buf, sizeof(buf), 0);  
-	sprintf(buf, "Content-type: text/html\r\n");  
+	sprintf(buf, "Content-Type: text/html\r\n");  
 	send(client, buf, sizeof(buf), 0);  
 	sprintf(buf, "\r\n");  
 	send(client, buf, sizeof(buf), 0);  
@@ -181,20 +181,20 @@ void bad_request(int client)
 	sprintf(buf, "such as a POST without a Content-Length.\r\n");  
 	send(client, buf, sizeof(buf), 0);  
 }
-void cannot_execute(int client)  
+static void cannot_execute(int client)  
 {  
 	char buf[1024]; 
 	/* 回应客户端 cgi 无法执行*/  
 	sprintf(buf, "HTTP/1.0 500 Internal Server Error\r\n");  
 	send(client, buf, strlen(buf), 0);  
-	sprintf(buf, "Content-type: text/html\r\n");  
+	sprintf(buf, "Content-Type: text/html\r\n");  
 	send(client, buf, strlen(buf), 0);  
 	sprintf(buf, "\r\n");  
 	send(client, buf, strlen(buf), 0);  
 	sprintf(buf, "<P>Error prohibited CGI execution.\r\n");  
 	send(client, buf, strlen(buf), 0);  
 }
-static execute_cgi(int client, const char *path,const char *method,const char *query_string)
+static int execute_cgi(int client, const char *path,const char *method,const char *query_string)
 {
 	int cgi_output[2];
 	int cgi_input[2];
@@ -214,12 +214,11 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 	}else{//POST
 		/*在POST的HTTP请求中找到Content-Length:*/
 		numchars = get_line(client,buf,sizeof(buf));
-		while(numchars > 0 && strcmp("\n",buf)){
+		while((numchars > 0) && strcmp("\n",buf)){
 			buf[15] = '\0';
 			if(strcasecmp(buf,"Content-Length:") == 0)
 				content_length = atoi(&(buf[16]));
-			else
-				numchars = get_line(client,buf,sizeof(buf));
+			numchars = get_line(client,buf,sizeof(buf));
 		}
 		if(content_length == -1){
 			bad_request(client);
@@ -241,7 +240,8 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 	if((pid = fork()) < 0 ){
 		cannot_execute(client);
 		return -1;
-	}else if(pid == 0){
+	}
+	if(pid == 0){
 		char meth_env[255];
 		char query_env[255];
 		char length_env[255];
@@ -275,6 +275,7 @@ static execute_cgi(int client, const char *path,const char *method,const char *q
 		close(cgi_input[1]);
 		waitpid(pid,&status,0);
 	}
+	return -1;
 
 }
 void accept_request(int client)
@@ -292,13 +293,13 @@ void accept_request(int client)
 	numchars = get_line(client,buf,sizeof(buf));//得到请求的第一行
 	i = j = 0;
 	//把客户端请求方法存放到method数组
-	while(!ISspace(buf[i]) && (i < sizeof(method) -1))
+	while(!ISspace(buf[j]) && (i < sizeof(method) -1))
 		method[i++]=buf[j++];
 	method[i] = '\0';
 	/*strcasecmp 判断字符串是否相当并且忽略大小写*/
 	if(strcasecmp(method,"GET") && strcasecmp(method,"POST")){
 		unimplemented(client);
-		printf("not get and post\n");
+		//printf("not get and post\n");
 		return;
 	}
 	/*开启cgi*/
@@ -339,15 +340,15 @@ void accept_request(int client)
 	}else{
 		/*如果有这个目录，则默认使用该目录下的index.html*/
 		if((st.st_mode & S_IFMT) == S_IFDIR)
-			strcat(path,"index.html");
+			strcat(path,"/index.html");
 		if((st.st_mode & S_IXUSR /*文件所有则有可执行权限*/) || (st.st_mode & S_IXGRP /*用户组具可执行权限*/) || (st.st_mode & S_IXOTH/*其他用户具可执行权限*/))
 			cgi = 1;
 		if(!cgi){
 			serve_file(client,path);
-			debug_inf("this not cgi");
+			//debug_inf("this not cgi");
 		}
 		else{
-			debug_inf("cgi");
+			//debug_inf("cgi");
 			execute_cgi(client,path,method,query_string);
 		}
 	}
@@ -356,13 +357,14 @@ void accept_request(int client)
 int main(int argc,char *argv[])
 {
 	int server_sock = -1;
-	unsigned short port = 8091;
+	unsigned short port;
 	int client_sock = -1;
 	struct sockaddr_in client_name;
 	int client_name_len = sizeof(client_name);
 	pthread_t newthread;
 
 	server_sock = startup(&port);
+	printf("httpd running on port %d\n", port);
 	while(1){
 		if ( (client_sock = accept(server_sock,(struct sockaddr *)&client_name,&client_name_len)) < 0)
 			error_die("accept");
