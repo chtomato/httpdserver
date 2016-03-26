@@ -1,0 +1,56 @@
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<title>local time</title>
+		<script type="text/javascript" >
+			function createXHR()
+			{
+				var xhr;
+				try{
+					xhr = new ActiveXObject("Msxml2.XMLHTTP")
+				}catch(e){
+					try{
+						xhr = new ActiveXObject("Microsoft.XMLHTTP")
+					}catch(E){
+						xhr = false
+					}
+				}
+				if(!xhr && typeof XMLHttpRequest != 'undefined')
+					xhr = new XMLHttpRequest()
+				return xhr
+			}
+			function sender()
+			{
+				xhr = createXHR();
+				if(xhr){
+					xhr.onreadystatechange = callbackFunction;
+					xhr.open("GET","localtime.lua?cur_time="+new Date().getTime())
+					xhr.send(null);
+				}else{
+					alert("浏览器不支持，请更换浏览器！")
+				}
+			}	
+			function callbackFunction()
+			{
+				if(xhr.readyState == 4){
+					if (xhr.status == 200){
+						var returnValue = xhr.responseText;
+						if ( returnValue != null && returnValue.length > 0)
+							document.getElementById("current_time").innerHTML = returnValue
+						else
+							alert("结果为空！")
+					}
+					else
+						alert("页面异常!")
+				}
+			}
+				
+
+		</script>
+		<body>
+			<h3>获取服务器当前时间</h3>
+			<p>服务器当前时间是:<div id="current_time"> </div></p>
+			<input type="button" value="提交" onclick="sender()"></input>
+		</body>
+	</head>
+</html>
